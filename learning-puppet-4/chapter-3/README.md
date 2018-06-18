@@ -40,4 +40,12 @@ In this chapter, we are going to install Puppet in the new vagrant box that we h
      sudo chown -R vagrant /etc/puppetlabs
      ```
 
+     In addition to be able to run `puppet` command without writing `sudo`, in many cases we do need to run `sudo puppet` (for instance, to view resources that requires sudo privilege). Therefore, we need to add `/opt/puppetlabs/bin` directory to sudo's secure path:
+
+     ```
+     sudo grep secure_path /etc/sudoers \
+       | sed -e 's#$#:/opt/puppetlabs/bin#' \
+       | sudo tee /etc/sudoers.d/puppet-securepath
+     ```
+
 That's all and we're set to go.
