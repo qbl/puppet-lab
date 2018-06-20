@@ -6,19 +6,19 @@
 
 1. Puppet variables are just like Ruby variables prefixed with $:
 
-     ```
+     ```puppet
      $my_var
      ```
 
 2. Variables starting with underscore should only be used within the local scope:
 
-     ```
+     ```puppet
      $_my_var
      ```
 
 3. Variable assignment works just as Ruby assignmen:
 
-     ```
+     ```puppet
      $string_var = 'value'
      $num_var = 1234
      $boolean_var = true
@@ -26,13 +26,13 @@
 
 4. Uninitialized variabbles are evaluated as `undef`. We can assign `undef` to a variable:
 
-     ```
+     ```puppet
      $not_defined_var = undef
      ```
 
 5. We can use `puppetlabs/stdlib` module to see variable's type:
 
-     ```
+     ```puppet
      include stdlib
      $name_type = type_of($my_name)
      $num_type = type_of($my_num)
@@ -42,7 +42,7 @@
 
 Valid numeric types in Puppet are:
 
-```
+```puppet
 $decimal = 1234
 $float = 12.34
 $octal = 0775
@@ -56,7 +56,7 @@ I'm still unsure about the `$string` part, is it treated as numeric or as string
 
 1. Arrays in Puppet work just like arrays in Ruby, they can contain objects with different data type:
 
-     ```
+     ```puppet
      $num_array = [1, 2, 3, 4]
      $text_array = ["A", "B", "C", "D"]
      $mixed_array = [1, "A", 2, "B"]
@@ -66,22 +66,46 @@ I'm still unsure about the `$string` part, is it treated as numeric or as string
 
 2. Puppet allow array-to-array assignment if there are equal number of variables and values:
 
-     ```
+     ```puppet
      [$first, $middle, $last] = ["Iqbal", undef, "Farabi"] # OK
      [$first, $middle, $last] = ["Iqbal", "Farabi"] # not OK
      ```
 
 3. Splat operator works just as normal Ruby, we can use it to convert array to comma-separated list of values with `*`:
 
-     ```
+     ```puppet
      my_method(*$array_of_arguments) { # some block here }
      ```
 
 4. The biggest difference with Ruby hashes is that hashes in Puppet only allow string and number as key and do not allow symbol. Therefore, we can only use `=>` in Puppet hashes:
 
-     ```
+     ```puppet
      $homes = {
        'qbl' => '/home/qbl'
+     }
+     ```
+
+5. In Puppet, we can retrieve specific values from a hash bby assigning to an array of variables for the keys we'd like to retrieve. I find this one to be quite peculiar as well:
+
+     ```puppet
+     [$iqbal] = $homes # in Puppet, this is identical to $iqbal = $homes['iqbal']
+     [$username, $uid] = $user # $username = $user['username'] and $uid = $user['uid']
+     ```
+
+6. We can also define attribute with hash in Puppet by combining it with splat operator:
+
+     ```puppet
+     $resource_attributes = {
+       ensure => present,
+       owner => root,
+       group => root,
+       'mode' => '0644',
+       'replace' => true
+     }
+
+     file { '/etc/config/first.cfg':
+       source => 'first.cfg',
+       * => $resource_attributes
      }
      ```
 
@@ -89,13 +113,13 @@ I'm still unsure about the `$string` part, is it treated as numeric or as string
 
 1. String interpolation works with `${}` inside double quotes:
 
-     ```
+     ```puppet
      notice("Hello ${username}, how are you today?")
      ```
 
 2. For large block of text, we can use heredoc multiline format:
 
-     ```
+     ```puppet
      $message = @(END)
      This is a long message,
      spanning into multiple lines.
@@ -104,7 +128,7 @@ I'm still unsure about the `$string` part, is it treated as numeric or as string
 
 3. To do string interpolation with heredoc multiline format, use:
 
-     ```
+     ```puppet
      $message = @("END")
      Dear ${user},
      To change your password, please visit this page: ${site_url}.
@@ -113,7 +137,7 @@ I'm still unsure about the `$string` part, is it treated as numeric or as string
 
 4. To redact sensitive values, we can use:
 
-     ```
+     ```puppet
      $my_passphrase = Sensitive("Some sensitive passphrase here")
      ```
 
@@ -125,14 +149,14 @@ I'm still unsure about the `$string` part, is it treated as numeric or as string
 
 6. However, I can understand that the following examples work just fine:
 
-     ```
+     ```puppet
      notice("The second value in the list is ${my_list[1]}")
      notice("The value stored with key alpha is ${my_hash['alpha']}")
      ```
 
 7. To prevent interpolation, we use escape character `\`:
 
-     ```
+     ```puppet
      $the_greeting = "we need 'single quotes' and \"double quotes\" here."
      $describe = "\$user uses a \$ dollar sign and a \\ backslash"
      ```
@@ -165,7 +189,7 @@ Puppet is bundled with a tool called Facter. We can use Facter to find facts abo
 
 2. Puppet always adds the following facts above and beyond system facts provided by Facter:
 
-     ```
+     ```puppet
      $facts['clientcert']
      $facts['clientversion']
      $facts['clientnoop']
@@ -188,4 +212,69 @@ Puppet is bundled with a tool called Facter. We can use Facter to find facts abo
 
      facter --json
      puppet facts find --render-as json
+     ```
+
+## Calling Functions in Manifests
+
+According to the book, functions in Puppet may return a value. I find this interesting because in Ruby, every method always returns a value and I think functions in Puppet is the equivalent of methods in Ruby.
+
+Below we can find two examples how to call `md5` function in a manifest:
+
+```puppet
+# Example 1: calling function
+notify { 'md5_hash':
+  message => md5($facts['fqdn'])
+}
+
+# Example 2: calling function in string interpolation
+$result = "The MD5 hash for the node name is ${md5($facts['fqdn'])}"
+notify { 'result':
+  message => $result
+}
+```
+
+## Declaring Multiple Resources
+
+1. We can use array to define multiple resource titles:
+
+     ```puppet
+     file { ['/tmp/file_one.txt', '/tmp/file_two.txt']:
+       ensure => present,
+       owner => vagrant
+     }
+     ```
+
+     Resource definition above will create two files.
+
+2. We can declare multiple resource bodies such as:
+
+     ```puppet
+     file {
+       `file_one`:
+         ensure => present,
+         owner => 'vagrant',
+         path => 'file_one.txt'
+       ;
+
+       `file_two`:
+         ensure => present,
+         owner => 'vagrant',
+         path => 'file_two.txt'
+     }
+     ```
+
+     Resource defnition above will create two files.
+
+3. Multiple resource definiton can come very handy when we are doing things such as the following:
+
+     ```puppet
+     file {
+       default:
+         ensure => present,
+         owner => 'vagrant'
+       ;
+
+       'file_one': path => 'file_one.txt';
+       'file_two': path => 'file_two.txt';
+     }
      ```
